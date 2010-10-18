@@ -45,3 +45,12 @@
 # import <Three20/Three20.h>
 #endif
 
+// We can turn this on an off to quickly enable/disable logs
+// TODO: We can point this to a pre-processor bit in the project file for 
+// diffent project builds/configurations
+#ifdef LOGGING
+#define DLog(fmt, ...) NSLog((@"%s [Line %d] " fmt), __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__);
+#else
+#define DLog(...)
+#endif
+

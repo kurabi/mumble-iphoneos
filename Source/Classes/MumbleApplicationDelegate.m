@@ -1,32 +1,32 @@
 /* Copyright (C) 2009-2010 Mikkel Krautz <mikkel@krautz.dk>
-
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions
-   are met:
-
-   - Redistributions of source code must retain the above copyright notice,
-     this list of conditions and the following disclaimer.
-   - Redistributions in binary form must reproduce the above copyright notice,
-     this list of conditions and the following disclaimer in the documentation
-     and/or other materials provided with the distribution.
-   - Neither the name of the Mumble Developers nor the names of its
-     contributors may be used to endorse or promote products derived from this
-     software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR
-   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-   EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-   PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-   PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ 
+ All rights reserved.
+ 
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 
+ - Redistributions of source code must retain the above copyright notice,
+ this list of conditions and the following disclaimer.
+ - Redistributions in binary form must reproduce the above copyright notice,
+ this list of conditions and the following disclaimer in the documentation
+ and/or other materials provided with the distribution.
+ - Neither the name of the Mumble Developers nor the names of its
+ contributors may be used to endorse or promote products derived from this
+ software without specific prior written permission.
+ 
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR
+ CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #import "MumbleApplicationDelegate.h"
 
@@ -53,31 +53,31 @@
 
 - (void) applicationDidFinishLaunching:(UIApplication *)application {
 	_launchDate = [[NSDate alloc] init];
-
+	
 	UIUserInterfaceIdiom idiom = [[UIDevice currentDevice] userInterfaceIdiom];
 	[window makeKeyAndVisible];
-
+	
 	[self reloadPreferences];
 	[Database initializeDatabase];
 	[TTDefaultStyleSheet setGlobalStyleSheet:[[[MumbleStyleSheet alloc] init] autorelease]];
-
+	
 	self.navigationController.toolbarHidden = YES;
 	[window addSubview:[navigationController view]];
-
+	
 	// Create a fake splash screen that we can animate to give us
 	// a pretty fade-in launch...
 	UIScreen *screen = [UIScreen mainScreen];
 	UIImageView *imageView = [[UIImageView alloc] initWithFrame:[screen applicationFrame]];
 	[imageView setImage:[UIImage imageNamed:@"Splash.png"]];
 	[window addSubview:imageView];
-
+	
 #if 1
 	self.navigationController.view.autoresizesSubviews = YES;
-
+	
 	WelcomeScreenController *welcomeScreen = [[WelcomeScreenController alloc] init];
 	[navigationController pushViewController:welcomeScreen animated:NO];
 	[welcomeScreen release];
-
+	
 #else
 	if (idiom == UIUserInterfaceIdiomPad) {
 		NSLog(@"UIUserInterfaceIdiomPad detected.");
@@ -97,7 +97,7 @@
 	} completion:^(BOOL finished){
 		[imageView removeFromSuperview];
 		[imageView release];
-
+		
 		[self notifyCrash];
 		_verCheck = [[VersionChecker alloc] init];
 	}];	
@@ -119,11 +119,11 @@
 	if ([MumbleApp didCrashRecently]) {
 		NSString *title = @"Beta Crash Reporting";
 		NSString *msg = @"Mumble has detected that it has recently crashed.\n\n"
-						"Don't forget to report your crashes to the beta portal using the crash reporting tool.\n";
+		"Don't forget to report your crashes to the beta portal using the crash reporting tool.\n";
 		UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:title message:msg delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil];
 		[alertView show];
 		[alertView release];
-
+		
 		[MumbleApp resetCrashCount];
 	}
 }
@@ -131,7 +131,7 @@
 - (void) setupAudio {
 	// Set up a good set of default audio settings.
 	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
+	
 	MKAudioSettings settings;
 	settings.codec = MKCodecFormatCELT;
 	settings.quality = 24000;
@@ -143,7 +143,7 @@
 	settings.outputDelay = 0; /* 10 ms */
 	settings.enablePreprocessor = [defaults boolForKey:@"AudioInputPreprocessor"];
 	settings.enableBenchmark = YES;
-
+	
 	MKAudio *audio = [MKAudio sharedAudio];
 	[audio updateAudioSettings:&settings];
 	[audio restart];
@@ -166,10 +166,25 @@
 	// In case we've been backgrounded by a phone call, MKAudio will
 	// already have shut itself down.
 	NSArray *connections = [[MKConnectionController sharedController] allConnections];
-	if ([connections count] == 0) {
-		NSLog(@"MumbleApplicationDelegate: Not connected to a server. Stopping MKAudio.");
-		[[MKAudio sharedAudio] stop];
+	if ([connections count] != 0) {
+		DLog(@"Connected to a server. Stopping MKAudio. Forcing TCP state.");
+		MKConnection *conn = [[connections objectAtIndex:0] pointerValue];
+		// Force into TCP state so app can wake upon recieving TCP frames
+		[conn forceConnectionIntoTCPState]; 
 	}
+	// For the sake of testing voip stuff, lets always have the audio stop so the
+	// application enter deep sleep immedialty.
+	[[MKAudio sharedAudio] stop];
+}
+
+- (void)applicationDidEnterBackground:(UIApplication *)application
+{
+    DLog(@"Entering Background. Registering keep alive timeout.");
+	// Minimum is 600 seconds
+    BOOL result = [application setKeepAliveTimeout:600 handler: ^{
+		// TODO: ping server
+        DLog(@"Keep alive is triggered.");
+    }];
 }
 
 - (void) applicationDidBecomeActive:(UIApplication *)application {
@@ -181,7 +196,7 @@
 	// For regular backgrounding, we usually don't turn off the audio system, and
 	// we won't have to start it again.
 	if (![[MKAudio sharedAudio] isRunning]) {
-		NSLog(@"MumbleApplicationDelegate: MKAudio not running. Starting it.");
+		DLog(@"MKAudio not running. Starting it.");
 		[[MKAudio sharedAudio] start];
 	}
 }
